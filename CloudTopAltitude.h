@@ -23,7 +23,7 @@
 #define CLOUD_TOP_ALTITUDE
 #include <stdio.h>
 #include <assert.h>
-#define CTOP_LUT_MT2_V20_PATH "./data/LUT/CTOP_LUT.mt2.v20.grd"
+#define CTOP_LUT_MT2_V20_PATH "E://02-QtProject//HSD2TMS//data//LUT//CTOP_LUT.mt2.v20.grd"
 namespace hsd2tms {
 struct CloudTopAltitude {
     /*
