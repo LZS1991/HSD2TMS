@@ -2,6 +2,13 @@
 #include "hsd2tms.h"
 #include <iostream>
 #include <chrono>
+
+//如果使用VS编译器，需要将代码强制转换为UTF-8,
+//并将文件保存为UTF-8编码，才能正确显示中文
+#if defined(_MSC_VER)&&(_MSC_VER>=1600)
+#pragma execution_character_set("utf-8")
+#endif
+
 namespace hsd2tms {
 void createTiles(uint32_t aMaxZoomLevel, const HimawariStandardData& aData,
                  DataType aType,
@@ -100,10 +107,6 @@ void createJapanTiles(int32_t aMinZoomLevel, const HimawariStandardData& aData,
     qDebug() << "The status of band" << aBand0 << " is: " << aData.mBands[aBand0].hasData();
     qDebug() << "The status of band" << aBand1 << " is: " << aData.mBands[aBand1].hasData();
     qDebug() << "The status of band" << aBand2 << " is: " << aData.mBands[aBand2].hasData();
-
-//    std::cout << aData.mBands[aBand0].hasData();
-//    std::cout << aData.mBands[aBand1].hasData();
-//    std::cout << aData.mBands[aBand2].hasData();
 
     if (!aData.mBands[aBand0].hasData() ||
             !aData.mBands[aBand1].hasData() ||
@@ -259,10 +262,19 @@ int main(int argc, char *argv[])
     himawariData.sort();
     auto t1 = std::chrono::system_clock::now();
 
-    hsd2tms::createJapanTiles(0, himawariData, hsd2tms::TypeRadiation, 0, 1, 2);
+//    hsd2tms::createJapanTiles(0, himawariData, hsd2tms::TypeRadiation, 0, 1, 2);
+//    hsd2tms::createTiles(8, himawariData, hsd2tms::TypeRadiation, 0, 1, 2);
+    hsd2tms::createTiles(8, himawariData, hsd2tms::TypeTemperature, 14);
+//    hsd2tms::createJapanTiles(0, himawariData, hsd2tms::TypeDust, 12, 13);
+//    hsd2tms::createJapanTiles(0, himawariData, hsd2tms::TypeRadiation, 1);
+//    hsd2tms::createJapanTiles(0, himawariData, hsd2tms::TypeTemperature, 14);
+//    hsd2tms::createTiles(6, himawariData, hsd2tms::TypeRadiation, 3, 4, 5);
+//    hsd2tms::createTiles(5, himawariData, hsd2tms::TypeTemperature, 14);
+//    hsd2tms::CloudTopAltitude cta;
+//    hsd2tms::createAltitudeFile(6, 58, 25, himawariData, cta);
+//    hsd2tms::createTile(6, 58, 25, himawariData, hsd2tms::TypeRadiation, 0, 1, 2);
 
     auto t2 = std::chrono::system_clock::now();
-
     hsd2tms::colorchart();
     printDuration("Load Data", t0, t1);
     printDuration("Create Files", t1, t2);

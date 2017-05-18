@@ -27,6 +27,11 @@
 #include <direct.h>
 #include "hsd2tms.h"
 #include <QDir>
+#include <QImage>
+#include <QSize>
+#include <QVector>
+#include <QRgb>
+
 namespace hsd2tms {
 
 inline void composePath(std::string& aPath, 
@@ -114,9 +119,7 @@ struct TileBitmap {
 
         // Check PNG header.
         uint8_t header[8];
-//#ifdef DEBUG
 
-//        #endif
         size_t read =        fread(header, 1, 8, fp);
         assert(read == 8);
         assert(0 == png_sig_cmp(header, 0, 8));
@@ -227,14 +230,19 @@ typedef TileBitmap<uint8_t[2], PNG_COLOR_TYPE_GA, 256, 256> GATile;
 typedef TileBitmap<uint8_t[1], PNG_COLOR_TYPE_PALETTE, 256, 256> PaletteTile;
 
 void colorchart() {
-    TileBitmap<uint8_t[1], PNG_COLOR_TYPE_PALETTE, 256, 10> bitmap;
-    bitmap.mPalette = ThermographPalette::getInstance();
-    for (auto& row: bitmap.mData) {
-        for (int i = 0; i < 256; i++) {
-            row[i][0] = i;
+    PNGPalette pngPalette = ThermographPalette::getInstance();
+    QImage colorChart(256, 10, QImage::Format_RGB32);
+    for(int i = 0; i < 256; i++)
+    {
+        for(int j = 0; j < 10; j++)
+        {
+            int red = pngPalette.mPaletteTable[i].red;
+            int green = pngPalette.mPaletteTable[i].green;
+            int blue = pngPalette.mPaletteTable[i].blue;
+            colorChart.setPixel(i,j,qRgb(red, green, blue));
         }
     }
-    bitmap.writePNG("./thermo.png");
+    colorChart.save("./thermo.png","PNG",100);
 }
 static const double kMaxRadiation[16] = 
 {300., 280., 260., 300., 40., 10., 1., 1.5,
@@ -329,27 +337,28 @@ void createTile(const std::string& aDir, uint32_t aZ, uint32_t aX, uint32_t aY,
     composePath(path, aZ, aX, aY, true);
     std::cout << "Creating " << path << std::endl;
 
-    PaletteTile bitmap;
-    static const PNGPalette pink = SingleColorPalette(0xFF, 0xCC, 0xCC);
-    PNGPalette& thermo = ThermographPalette::getInstance();
-
-    switch (aType) {
-    case TypeTemperature:
-        bitmap.mPalette = thermo;
-        break;
-    default:
-        bitmap.mPalette = pink;
-        break;
+    QImage image(256, 256, QImage::Format_Indexed8);
+    //User defined color table
+    QVector<QRgb> RGBVector;
+    for(int i = 0; i < 256; i++)
+    {
+        int red   = (i * i / 0xFF);
+        int green = 0xFF - ((i - 0x7f) * (i - 0x80) / 0x40);
+        int blue  = ((0xFF - i) * (0xFF - i)/ 0xFF);
+        RGBVector.append(qRgb(red,green,blue));
     }
-
-    for (int i = 0; i < 256; i++) {
+    image.setColorTable(RGBVector);
+    for(int i = 0; i < 256; i++)
+    {
         double latitude = tile.latitude(i);
-        for (int j = 0; j < 256; j++) {
+        for (int j = 0; j < 256; j++)
+        {
             double longitude = tile.longitude(j);
-            bitmap.mData[i][j][0] = normalizedData(aData, longitude, latitude, aType, aBand);
+            image.setPixel(j,i, normalizedData(aData, longitude, latitude, aType, aBand));
         }
     }
-    bitmap.writePNG(path.c_str());
+    image.save(QString::fromStdString(path), "PNG");
+
 }
 
 void createTile(const std::string& aDir, uint32_t aZ, uint32_t aX, uint32_t aY,
@@ -397,18 +406,21 @@ void createTile(const std::string& aDir, uint32_t aZ, uint32_t aX, uint32_t aY,
     composePath(path, aZ, aX, aY, true);
     std::cout << "Creating " << path << std::endl;
 
-    RGBTile bitmap;
-
-    for (int i = 0; i < 256; i++) {
+    //修改为通过QImage操作图片
+    QImage image(256,256, QImage::Format_RGB32);
+    for(int i = 0; i < 256; i++)
+    {
         double latitude = tile.latitude(i);
-        for (int j = 0; j < 256; j++) {
+        for (int j = 0; j < 256; j++)
+        {
             double longitude = tile.longitude(j);
-            bitmap.mData[i][j][0] = normalizedData(aData, longitude, latitude, aType, aBand2);
-            bitmap.mData[i][j][1] = normalizedData(aData, longitude, latitude, aType, aBand1);
-            bitmap.mData[i][j][2] = normalizedData(aData, longitude, latitude, aType, aBand0);
+            int r = normalizedData(aData, longitude, latitude, aType, aBand2);
+            int g = normalizedData(aData, longitude, latitude, aType, aBand1);
+            int b = normalizedData(aData, longitude, latitude, aType, aBand0);
+            image.setPixel(j, i, qRgb(r,g,b));
         }
     }
-    bitmap.writePNG(path.c_str());
+    image.save(QString::fromStdString(path), "PNG", 100);
 }
 
 void createTile(uint32_t aZ, uint32_t aX, uint32_t aY,
@@ -455,7 +467,6 @@ void shrinkTile(uint32_t aZ, uint32_t aX, uint32_t aY,
                 uint32_t aBand0, uint32_t aBand1, uint32_t aBand2) {
     std::string parent;
     DirNameProvider::compose(parent, aType, aBand0, aBand1, aBand2);
-
     static RGBTile src;
     static RGBTile dst;
     dst.fillZero();

@@ -25,14 +25,26 @@
 #include <sstream>
 #include <iostream>
 #include <iomanip>
-
-#include <cstring>
 #include "png.h"
 #include "pnginfo.h"
+#include <cstring>
 #include "HimawariStandardData.h"
 #include "TileMapService.h"
 #include "CloudTopAltitude.h"
 #include <QDebug>
+
+//#if CHAR_BIT == 8 && UCHAR_MAX == 255
+//   typedef unsigned char png_byte;
+//#else
+//#  error "libpng requires 8-bit bytes"
+//#endif
+
+//typedef struct png_color_struct
+//{
+//   png_byte red;
+//   png_byte green;
+//   png_byte blue;
+//} png_color;
 
 namespace hsd2tms {
 
@@ -97,6 +109,7 @@ public:
 };
 
 struct PNGPalette {
+
     png_color mPaletteTable[256];
     uint8_t mAlphaTable[256];
     PNGPalette& operator= (const PNGPalette& aSource) {
