@@ -338,7 +338,7 @@ void createTile(const std::string& aDir, uint32_t aZ, uint32_t aX, uint32_t aY,
     std::cout << "Creating " << path << std::endl;
 
     QImage image(256, 256, QImage::Format_Indexed8);
-    //User defined color table
+    // User defined color table
     QVector<QRgb> RGBVector;
     for(int i = 0; i < 256; i++)
     {
