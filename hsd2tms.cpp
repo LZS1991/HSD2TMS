@@ -29,6 +29,7 @@
 #include <QDir>
 #include <QImage>
 #include <QSize>
+#include <QImageWriter>
 
 namespace hsd2tms {
 
@@ -69,7 +70,10 @@ void colorchart() {
             colorChart.setPixel(i,j,i);
         }
     }
-    colorChart.save("./thermo.png","PNG",100);
+    //Because the original png file is so big,so compress them here
+    QImageWriter imageWriter("./thermo.png", "PNG");
+    imageWriter.setCompression(1);
+    imageWriter.write(colorChart);
 }
 static const double kMaxRadiation[16] = 
 {300., 280., 260., 300., 40., 10., 1., 1.5,
@@ -185,7 +189,11 @@ void createTile(const std::string& aDir, uint32_t aZ, uint32_t aX, uint32_t aY,
             image.setPixel(j,i, normalizedData(aData, longitude, latitude, aType, aBand));
         }
     }
-    image.save(QString::fromStdString(path), "PNG");
+    //Because the original png file is so big,so compress them here
+    QImageWriter imageWriter(QString::fromStdString(path), "PNG");
+    imageWriter.setCompression(1);
+    imageWriter.write(image);
+//    image.save(QString::fromStdString(path), "PNG");
 }
 
 void createTile(const std::string& aDir, uint32_t aZ, uint32_t aX, uint32_t aY,
@@ -221,7 +229,11 @@ void createTile(const std::string& aDir, uint32_t aZ, uint32_t aX, uint32_t aY,
             image.setPixel(j,i, normalizedData(aData, longitude, latitude, aType, aBand1));
         }
     }
-    image.save(QString::fromStdString(path), "PNG");
+    //Because the original png file is so big,so compress them here
+    QImageWriter imageWriter(QString::fromStdString(path), "PNG");
+    imageWriter.setCompression(1);
+    imageWriter.write(image);
+//    image.save(QString::fromStdString(path), "PNG");
 }
 
 void createTile(const std::string& aDir, uint32_t aZ, uint32_t aX, uint32_t aY,
@@ -249,7 +261,10 @@ void createTile(const std::string& aDir, uint32_t aZ, uint32_t aX, uint32_t aY,
             image.setPixel(j, i, qRgb(r,g,b));
         }
     }
-    image.save(QString::fromStdString(path), "PNG", 100);
+    //Because the original png file is so big,so compress them here
+    QImageWriter imageWriter(QString::fromStdString(path), "PNG");
+    imageWriter.setCompression(1);
+    imageWriter.write(image);
 }
 
 void createTile(uint32_t aZ, uint32_t aX, uint32_t aY,
