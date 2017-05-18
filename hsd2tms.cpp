@@ -29,8 +29,6 @@
 #include <QDir>
 #include <QImage>
 #include <QSize>
-#include <QVector>
-#include <QRgb>
 
 namespace hsd2tms {
 
@@ -60,186 +58,15 @@ inline void composePath(std::string& aPath,
     aPath += ".png";
 }
 
-
-// Note: T is either |uint8_t[2]| or |uint8_t[3]|, which corresponds
-//       gray+alpha bitmap or RGB bitmap respectively.
-template<typename T, const uint8_t _PNG_COLOR_TYPE, int _WIDTH, int _HEIGHT>
-struct TileBitmap {
-    T mData[_HEIGHT][_WIDTH];
-    uint8_t* mLines[_HEIGHT];
-    PNGPalette mPalette;
-    TileBitmap() {
-        fillZero();
-        for (int i = 0; i < _HEIGHT; i++) {
-            mLines[i] = &mData[i][0][0];
-        }
-    }
-
-    void fillZero() {
-        std::fill(&mData[0][0][0], &mData[_HEIGHT][0][0], 0);
-    }
-
-    inline uint8_t colorType() const {
-        return _PNG_COLOR_TYPE;
-    }
-
-    void writePNG(const char* aFileName) {
-        //XXX Do error handling!
-        FILE* fp = fopen(aFileName, "wb");
-        png_structp png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, 0, 0, 0);
-        png_infop info_ptr = png_create_info_struct(png_ptr);
-        setjmp(png_jmpbuf(png_ptr));
-        png_init_io(png_ptr, fp);
-
-        info_ptr->width = _WIDTH;
-        info_ptr->height = _HEIGHT;
-        info_ptr->bit_depth = 8;
-        info_ptr->color_type = _PNG_COLOR_TYPE;
-        info_ptr->interlace_type = PNG_INTERLACE_NONE;
-        info_ptr->compression_type = PNG_COMPRESSION_TYPE_DEFAULT;
-        info_ptr->filter_type = PNG_FILTER_TYPE_DEFAULT;
-
-        // Expecting static-if
-        if (PNG_COLOR_MASK_PALETTE & _PNG_COLOR_TYPE) {
-            png_set_tRNS(png_ptr, info_ptr, mPalette.mAlphaTable, 256, nullptr);
-            png_set_PLTE(png_ptr, info_ptr, mPalette.mPaletteTable, 256);
-        }
-
-        png_set_rows(png_ptr, info_ptr, mLines);
-        png_write_png(png_ptr, info_ptr, PNG_TRANSFORM_IDENTITY, 0);
-        png_destroy_write_struct(&png_ptr, 0);
-        fclose(fp);
-    }
-
-    bool readPNG(const char* aFileName) {
-        FILE *fp = fopen(aFileName, "rb");
-        if (!fp) {
-            return false;
-        }
-
-        // Check PNG header.
-        uint8_t header[8];
-
-        size_t read =        fread(header, 1, 8, fp);
-        assert(read == 8);
-        assert(0 == png_sig_cmp(header, 0, 8));
-
-        png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING,
-                                                     nullptr, nullptr, nullptr);
-        assert(png_ptr);
-        png_infop info_ptr = png_create_info_struct(png_ptr);
-        assert(info_ptr);
-
-        assert(!setjmp(png_jmpbuf(png_ptr)));
-        png_init_io(png_ptr, fp);
-        png_set_sig_bytes(png_ptr, 8);
-
-        png_read_info(png_ptr, info_ptr);
-
-        assert(_WIDTH == png_get_image_width(png_ptr, info_ptr));
-        assert(_HEIGHT == png_get_image_height(png_ptr, info_ptr));
-        assert(_PNG_COLOR_TYPE == png_get_color_type(png_ptr, info_ptr));
-        assert(8 == png_get_bit_depth(png_ptr, info_ptr));
-
-        // Expecting static-if
-        if (PNG_COLOR_MASK_PALETTE & _PNG_COLOR_TYPE) {
-            int size;
-            png_color_16p value;
-
-            uint8_t* alpha;;
-            png_get_tRNS(png_ptr, info_ptr, &alpha, &size, &value);
-            assert(256 == size);
-            //assert(nullptr == value);
-            std::memcpy(mPalette.mAlphaTable, alpha, sizeof(mPalette.mAlphaTable));
-
-            png_color* palette;
-            png_get_PLTE(png_ptr, info_ptr, &palette, &size);
-            assert(256 == size);
-            std::memcpy(mPalette.mPaletteTable, palette, sizeof(mPalette.mPaletteTable));
-        }
-
-        uint8_t* row = &(mData[0][0][0]);
-        for (int i = 0; i < _HEIGHT; i++) {
-            png_read_rows(png_ptr, &row, NULL, 1);
-            row += sizeof(T) * _WIDTH;
-        }
-        png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
-        fclose(fp);
-
-        return true;
-    }
-
-    inline void quarterCopy(TileBitmap<T, _PNG_COLOR_TYPE, _WIDTH, _HEIGHT>& aSrc,
-                            uint32_t aMatrixX, size_t aMatrixY) {
-        const size_t colors = sizeof(T);
-        const size_t offsetX = aMatrixX * (_WIDTH / 2);
-        const size_t offsetY = aMatrixY * (_HEIGHT / 2);
-
-        for (size_t i = 0; i < (_HEIGHT / 2); i++) {
-            for (size_t j = 0; j < (_WIDTH / 2); j++) {
-                for (size_t k = 0; k < colors; k++) {
-                    uint32_t data = aSrc.mData[(i * 2)     ][(j * 2)    ][k] +
-                            aSrc.mData[(i * 2)     ][(j * 2) + 1][k] +
-                            aSrc.mData[(i * 2)  + 1][(j * 2)    ][k] +
-                            aSrc.mData[(i * 2)  + 1][(j * 2) + 1][k];
-                    mData[i + offsetY][j + offsetX][k] = uint8_t(data / 4);
-                }
-            }
-        }
-    }
-
-    inline bool
-    readAndQuaterCopy(TileBitmap<T, _PNG_COLOR_TYPE, _WIDTH, _HEIGHT>& aSrc,
-                      const std::string& aParent,
-                      uint32_t aZ, uint32_t aX, uint32_t aY,
-                      uint32_t aMatrixX, size_t aMatrixY) {
-        std::string sourcePath(aParent);
-        composePath(sourcePath, aZ + 1 , aX * 2 + aMatrixX, aY * 2 + aMatrixY, false);
-        bool found = aSrc.readPNG(sourcePath.c_str());
-        if (found) {
-            quarterCopy(aSrc, aMatrixX, aMatrixY);
-        }
-        return found;
-    }
-
-    void shrinkTile(TileBitmap<T, _PNG_COLOR_TYPE, _WIDTH, _HEIGHT>& aSrc,
-                    const std::string& aParent,
-                    uint32_t aZ, uint32_t aX, uint32_t aY) {
-
-        std::string path(aParent);
-        composePath(path, aZ, aX, aY, true);
-        std::cout << "Creating " << path << std::endl;
-
-        bool totalFound  = readAndQuaterCopy(aSrc, aParent, aZ, aX, aY, 0, 0);
-        totalFound |= readAndQuaterCopy(aSrc, aParent, aZ, aX, aY, 0, 1);
-        totalFound |= readAndQuaterCopy(aSrc, aParent, aZ, aX, aY, 1, 0);
-        totalFound |= readAndQuaterCopy(aSrc, aParent, aZ, aX, aY, 1, 1);
-
-        if (totalFound) {
-            // Expecting static-if
-            if (PNG_COLOR_MASK_PALETTE & _PNG_COLOR_TYPE) {
-                mPalette = aSrc.mPalette;
-            }
-            writePNG(path.c_str());
-        }
-    }
-};
-
-typedef TileBitmap<uint8_t[3], PNG_COLOR_TYPE_RGB, 256, 256> RGBTile;
-typedef TileBitmap<uint8_t[2], PNG_COLOR_TYPE_GA, 256, 256> GATile;
-typedef TileBitmap<uint8_t[1], PNG_COLOR_TYPE_PALETTE, 256, 256> PaletteTile;
-
 void colorchart() {
-    PNGPalette pngPalette = ThermographPalette::getInstance();
-    QImage colorChart(256, 10, QImage::Format_RGB32);
+    QVector<QRgb> RGBVector = getTemperatureColorTable();
+    QImage colorChart(256, 10, QImage::Format_Indexed8);
+    colorChart.setColorTable(RGBVector);
     for(int i = 0; i < 256; i++)
     {
         for(int j = 0; j < 10; j++)
         {
-            int red = pngPalette.mPaletteTable[i].red;
-            int green = pngPalette.mPaletteTable[i].green;
-            int blue = pngPalette.mPaletteTable[i].blue;
-            colorChart.setPixel(i,j,qRgb(red, green, blue));
+            colorChart.setPixel(i,j,i);
         }
     }
     colorChart.save("./thermo.png","PNG",100);
@@ -336,17 +163,18 @@ void createTile(const std::string& aDir, uint32_t aZ, uint32_t aX, uint32_t aY,
     std::string path(aDir);
     composePath(path, aZ, aX, aY, true);
     std::cout << "Creating " << path << std::endl;
-
-    QImage image(256, 256, QImage::Format_Indexed8);
     // User defined color table
     QVector<QRgb> RGBVector;
-    for(int i = 0; i < 256; i++)
-    {
-        int red   = (i * i / 0xFF);
-        int green = 0xFF - ((i - 0x7f) * (i - 0x80) / 0x40);
-        int blue  = ((0xFF - i) * (0xFF - i)/ 0xFF);
-        RGBVector.append(qRgb(red,green,blue));
+    switch (aType) {
+    case TypeTemperature:
+        RGBVector = getTemperatureColorTable();
+        break;
+    default:
+        RGBVector = getPinkColorTable();
+        break;
     }
+
+    QImage image(256, 256, QImage::Format_Indexed8);
     image.setColorTable(RGBVector);
     for(int i = 0; i < 256; i++)
     {
@@ -358,7 +186,6 @@ void createTile(const std::string& aDir, uint32_t aZ, uint32_t aX, uint32_t aY,
         }
     }
     image.save(QString::fromStdString(path), "PNG");
-
 }
 
 void createTile(const std::string& aDir, uint32_t aZ, uint32_t aX, uint32_t aY,
@@ -372,27 +199,29 @@ void createTile(const std::string& aDir, uint32_t aZ, uint32_t aX, uint32_t aY,
     composePath(path, aZ, aX, aY, true);
     std::cout << "Creating " << path << std::endl;
 
-    PaletteTile bitmap;
-    static const PNGPalette yellow = SingleColorPalette(0xFF, 0xFF, 0x00);
-    static const PNGPalette pink = SingleColorPalette(0xFF, 0xCC, 0xCC);
-
+    // User defined color table
+    QVector<QRgb> RGBVector;
     switch (aType) {
     case TypeDust:
-        bitmap.mPalette = yellow;
+        RGBVector = getYellowColorTable();
         break;
     default:
-        bitmap.mPalette = pink;
+        RGBVector = getPinkColorTable();
         break;
     }
 
-    for (int i = 0; i < 256; i++) {
+    QImage image(256, 256, QImage::Format_Indexed8);
+    image.setColorTable(RGBVector);
+    for(int i = 0; i < 256; i++)
+    {
         double latitude = tile.latitude(i);
-        for (int j = 0; j < 256; j++) {
+        for (int j = 0; j < 256; j++)
+        {
             double longitude = tile.longitude(j);
-            bitmap.mData[i][j][0] = normalizedData(aData, longitude, latitude, aType, aBand0, aBand1);
+            image.setPixel(j,i, normalizedData(aData, longitude, latitude, aType, aBand1));
         }
     }
-    bitmap.writePNG(path.c_str());
+    image.save(QString::fromStdString(path), "PNG");
 }
 
 void createTile(const std::string& aDir, uint32_t aZ, uint32_t aX, uint32_t aY,
@@ -450,29 +279,6 @@ void createTile(uint32_t aZ, uint32_t aX, uint32_t aY,
     createTile(path, aZ, aX, aY, aData, aType, aBand0, aBand1, aBand2);
 }
 
-void shrinkTile(uint32_t aZ, uint32_t aX, uint32_t aY,
-                DataType aType,
-                uint32_t aBand) {
-    std::string parent;
-    DirNameProvider::compose(parent, aType, aBand);
-
-    static PaletteTile src;
-    static PaletteTile dst;
-    dst.fillZero();
-    dst.shrinkTile(src, parent, aZ, aX, aY);
-}
-
-void shrinkTile(uint32_t aZ, uint32_t aX, uint32_t aY,
-                DataType aType,
-                uint32_t aBand0, uint32_t aBand1, uint32_t aBand2) {
-    std::string parent;
-    DirNameProvider::compose(parent, aType, aBand0, aBand1, aBand2);
-    static RGBTile src;
-    static RGBTile dst;
-    dst.fillZero();
-    dst.shrinkTile(src, parent, aZ, aX, aY);
-}
-
 inline void composeJSPath(std::string& aPath, 
                           uint32_t aZ, uint32_t aX, uint32_t aY, bool aMkdir) {
     QDir dir;
@@ -523,4 +329,36 @@ void createAltitudeFile(uint32_t aZ, uint32_t aX, uint32_t aY,
     }
     output << "]);\n";
 }
+
+QVector<QRgb> getTemperatureColorTable()
+{
+    QVector<QRgb> RGBVector;
+    for(int i = 0; i < 256; i++)
+    {
+        int red   = (i * i / 0xFF);
+        int green = 0xFF - ((i - 0x7f) * (i - 0x80) / 0x40);
+        int blue  = ((0xFF - i) * (0xFF - i)/ 0xFF);
+        RGBVector.append(qRgb(red,green,blue));
+    }
+    return RGBVector;
+}
+
+QVector<QRgb> getPinkColorTable()
+{
+    QVector<QRgb> RGBVector;
+    for(int i = 0; i < 256; i++)
+        RGBVector.append(qRgb(0xFF,0xCC,0xCC));
+
+    return RGBVector;
+}
+
+QVector<QRgb> getYellowColorTable()
+{
+    QVector<QRgb> RGBVector;
+    for(int i = 0; i < 256; i++)
+        RGBVector.append(qRgb(0xFF,0xFF,0x00));
+
+    return RGBVector;
+}
+
 } // hsd2tms

@@ -6,10 +6,6 @@
 #include <assert.h>
 #include <stdint.h>
 //定义一些在C中需要的函数
-//typedef unsigned char      uint8_t;
-//typedef unsigned short     uint16_t;
-//typedef unsigned int       uint32_t;
-//typedef unsigned long long uint64_t;
 #define M_PI       3.14159265358979323846
 #define REFACTORING_PLAN1
 
@@ -407,7 +403,7 @@ struct PositionInfoBlock {
             return;
         }
         static const ForwardCompare comp;
-        auto itr = lower_bound(array.begin(), array.end(), aY, comp);
+        auto itr = lower_bound(array.begin(), array.end()-1, aY, comp);
         aX += itr->mDeltaX;
         aY += itr->mDeltaY;
     }
@@ -430,7 +426,10 @@ struct PositionInfoBlock {
         }
         static const BackwardCompare bwdcomp;
         //XXX I'm not too sure [aItem.mIntY + aItem.mDeltaY] is sorted...
-        auto itr = lower_bound(array.begin(), array.end(), aY, bwdcomp);
+        //LZS2851
+        //Change the array.end() to array.end() - 1
+        auto itr = lower_bound(array.begin(), array.end()-1, aY, bwdcomp);
+
         aX -= itr->mDeltaX;
         aY -= itr->mDeltaY;
     }
@@ -715,8 +714,7 @@ struct HimawariStandardDataBand {
 
     double temperatureAt(double aLongitude, double aLatitude) const {
         const double rad = radiationAt(aLongitude, aLatitude) * 1000000.;
-        const CalibrationInfoBlockBody& calibration =
-                mSegments[0]->mCalibrationInfoBlock.body;
+        const CalibrationInfoBlockBody& calibration = mSegments[0]->mCalibrationInfoBlock.body;
         const CalibrationInfoBlockBodyInfrared& infrared = calibration.u.infrared;
 
         const double& h = infrared.mH;

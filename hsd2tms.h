@@ -25,26 +25,26 @@
 #include <sstream>
 #include <iostream>
 #include <iomanip>
-#include "png.h"
-#include "pnginfo.h"
 #include <cstring>
 #include "HimawariStandardData.h"
 #include "TileMapService.h"
 #include "CloudTopAltitude.h"
 #include <QDebug>
+#include <QVector>
+#include <QRgb>
 
-//#if CHAR_BIT == 8 && UCHAR_MAX == 255
-//   typedef unsigned char png_byte;
-//#else
-//#  error "libpng requires 8-bit bytes"
-//#endif
+#if CHAR_BIT == 8 && UCHAR_MAX == 255
+   typedef unsigned char png_byte;
+#else
+#  error "libpng requires 8-bit bytes"
+#endif
 
-//typedef struct png_color_struct
-//{
-//   png_byte red;
-//   png_byte green;
-//   png_byte blue;
-//} png_color;
+typedef struct png_color_struct
+{
+   png_byte red;
+   png_byte green;
+   png_byte blue;
+} png_color;
 
 namespace hsd2tms {
 
@@ -183,19 +183,17 @@ void createTile(const std::string& aDir, uint32_t aZ, uint32_t aX, uint32_t aY,
                 const HimawariStandardData& aData, DataType aType,
                 uint32_t aBand0, uint32_t aBand1, uint32_t aBand2);
 
-
-void shrinkTile(uint32_t aZ, uint32_t aX, uint32_t aY,
-                DataType aType,
-                uint32_t aBand);
-void shrinkTile(uint32_t aZ, uint32_t aX, uint32_t aY,
-                DataType aType,
-                uint32_t aBand0, uint32_t aBand1, uint32_t aBand2);
-
 void createAltitudeFile(uint32_t aZ, uint32_t aX, uint32_t aY,
                         const HimawariStandardData& aData,
                         const CloudTopAltitude& aTable);
 
 void colorchart();
+
+QVector<QRgb> getTemperatureColorTable();
+
+QVector<QRgb> getPinkColorTable();
+
+QVector<QRgb> getYellowColorTable();
 
 } // hsd2tms
 #endif

@@ -9,9 +9,8 @@ CONFIG -= app_bundle
 
 TEMPLATE = app
 
-INCLUDEPATH += ./include/libpng16 \
-               ./include/zlib \
-               ./include/cpputest
+#INCLUDEPATH += ./include/zlib \
+#               ./include/cpputest
 
 linux-g++ {
     LIBS += -L$$PWD/lib/  -lIce
@@ -21,13 +20,13 @@ linux-g++ {
 
 win32{
     CONFIG(release, debug|release) {
-        LIBS += -L$$PWD/lib/libpng16/  -llibpng16_static
-        LIBS += -L$$PWD/lib/zlib/  -lzlib
+#        LIBS += -L$$PWD/lib/libpng16/  -llibpng16_static
+#        LIBS += -L$$PWD/lib/zlib/  -lzlib
     }
 
     CONFIG(debug, debug|release) {
-        LIBS += -L$$PWD/lib/libpng16/  -llibpng16_staticd
-        LIBS += -L$$PWD/lib/zlib/  -lzlibd
+#        LIBS += -L$$PWD/lib/libpng16/  -llibpng16_staticd
+#        LIBS += -L$$PWD/lib/zlib/  -lzlibd
     }
 }
 
